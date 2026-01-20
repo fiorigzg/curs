@@ -1,0 +1,16 @@
+# Build context is repo root for api & workers. Exclude heavy / irrelevant dirs.
+.git
+design/
+docs/
+infra/
+*.md
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+apps/mobile
+node_modules
+**/node_modules
+CURS Portfolio Tracker.html

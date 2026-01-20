@@ -1,0 +1,16 @@
+{
+  "name": "curs",
+  "private": true,
+  "version": "0.0.0",
+  "description": "CURS Portfolio Tracker — monorepo root",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "up": "docker compose -f infra/docker-compose.yml --env-file infra/.env up -d",
+    "up:prod": "docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml --env-file infra/.env up -d",
+    "down": "docker compose -f infra/docker-compose.yml --env-file infra/.env down",
+    "logs": "docker compose -f infra/docker-compose.yml --env-file infra/.env logs -f"
+  }
+}

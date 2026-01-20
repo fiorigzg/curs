@@ -1,0 +1,49 @@
+# ---------- Env / secrets ----------
+.env
+.env.local
+.env.*.local
+infra/.env
+infra/traefik/acme.json
+*.pem
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.uv-cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# ---------- Node / pnpm / Expo ----------
+node_modules/
+.pnpm-store/
+.expo/
+.expo-shared/
+*.tsbuildinfo
+.next/
+
+# ---------- IDE / OS ----------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ---------- Docker / volumes ----------
+postgres-data/
+redis-data/
+traefik-data/
+
+# ---------- Bundled tarballs we don't track ----------
+*.tar
+*.tar.gz
+*.tgz

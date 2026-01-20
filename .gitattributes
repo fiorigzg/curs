@@ -1,0 +1,6 @@
+# Шелл-скрипты ВСЕГДА с LF — иначе CRLF ломает шебанг в Docker-контейнерах
+# (api/entrypoint.sh запускается как ENTRYPOINT). Критично на Windows с
+# core.autocrlf=true.
+*.sh text eol=lf
+apps/api/entrypoint.sh text eol=lf
+apps/workers/entrypoint.sh text eol=lf

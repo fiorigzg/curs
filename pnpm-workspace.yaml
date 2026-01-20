@@ -1,0 +1,3 @@
+# apps/mobile НЕ здесь — он управляется yarn (Expo/Metro vs pnpm-симлинки).
+packages:
+  - "packages/shared-types"
