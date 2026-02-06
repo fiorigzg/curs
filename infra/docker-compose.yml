@@ -1,0 +1,173 @@
+# ============================================================
+# CURS — base docker-compose (dev / localhost)
+# ============================================================
+# Default profile поднимает: postgres + redis + api + workers + traefik.
+# Traefik в dev слушает 8080 (dashboard) и проксирует api на 8000 без HTTPS.
+# Для прода подключи docker-compose.prod.yml сверху.
+
+name: curs
+
+networks:
+  curs:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  traefik-data:
+
+services:
+
+  # ----------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    networks: [curs]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    # Постгрес наружу не светим — доступен api/workers по сети curs.
+    # Для локальной отладки: docker compose exec postgres psql -U $POSTGRES_USER $POSTGRES_DB
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # ----------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks: [curs]
+    command: >
+      sh -c "
+      if [ -n \"$$REDIS_PASSWORD\" ]; then
+        redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes;
+      else
+        redis-server --appendonly yes;
+      fi
+      "
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    # Redis наружу не светим — доступен api/workers по сети curs.
+    # Для локальной отладки: docker compose exec redis redis-cli
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ${REDIS_PASSWORD:+-a $$REDIS_PASSWORD} ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  # ----------------------------------------------------------
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    networks: [curs]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      ACCESS_TOKEN_TTL_MIN: ${ACCESS_TOKEN_TTL_MIN}
+      REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS}
+      FERNET_KEY: ${FERNET_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      TINKOFF_DEV_TOKEN: ${TINKOFF_DEV_TOKEN}
+      TINKOFF_SANDBOX: ${TINKOFF_SANDBOX}
+      COINGECKO_API_KEY: ${COINGECKO_API_KEY}
+      COINGECKO_PLAN: ${COINGECKO_PLAN}
+      CBR_BASE_URL: ${CBR_BASE_URL}
+      LOG_LEVEL: ${LOG_LEVEL}
+      LOG_FORMAT: ${LOG_FORMAT}
+    ports:
+      # В dev пробрасываем напрямую; в prod Traefik снимает этот binding через override.
+      - "127.0.0.1:${API_PORT}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health',timeout=2).status==200 else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    labels:
+      - "traefik.enable=false"
+
+  # ----------------------------------------------------------
+  workers:
+    build:
+      context: ..
+      dockerfile: apps/workers/Dockerfile
+    restart: unless-stopped
+    networks: [curs]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      TINKOFF_DEV_TOKEN: ${TINKOFF_DEV_TOKEN}
+      TINKOFF_SANDBOX: ${TINKOFF_SANDBOX}
+      COINGECKO_API_KEY: ${COINGECKO_API_KEY}
+      COINGECKO_PLAN: ${COINGECKO_PLAN}
+      QUOTES_POLL_INTERVAL_SEC: ${QUOTES_POLL_INTERVAL_SEC}
+      RISK_METRICS_POLL_INTERVAL_SEC: ${RISK_METRICS_POLL_INTERVAL_SEC}
+      LOG_LEVEL: ${LOG_LEVEL}
+      LOG_FORMAT: ${LOG_FORMAT}
+    healthcheck:
+      # Воркеры пишут heartbeat в /tmp/curs-worker.heartbeat. Старше 60с → unhealthy.
+      test: ["CMD-SHELL", "test $$(($$(date +%s) - $$(stat -c %Y /tmp/curs-worker.heartbeat 2>/dev/null || echo 0))) -lt 60"]
+      interval: 15s
+      timeout: 3s
+      retries: 4
+      start_period: 20s
+
+  # ----------------------------------------------------------
+  traefik:
+    image: traefik:v3.1
+    restart: unless-stopped
+    networks: [curs]
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports:
+      # В dev: dashboard на ${TRAEFIK_DASHBOARD_PORT:-8088} (8080 часто занят).
+      # В prod overlay убирает этот биндинг и открывает 80/443.
+      - "127.0.0.1:${TRAEFIK_DASHBOARD_PORT:-8088}:8080"
+    volumes:
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - traefik-data:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
