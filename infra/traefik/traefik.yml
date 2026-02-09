@@ -1,0 +1,53 @@
+# ============================================================
+# Traefik static config
+# ============================================================
+# Один конфиг работает и в dev (без HTTPS, dashboard insecure на :8080),
+# и в prod (через docker-compose.prod.yml: открываются 80/443, dashboard за basic-auth).
+
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+# api dashboard. В dev — insecure: true (открыт без авторизации на 8080).
+# В prod опрашивается через router api@internal с middleware traefik-auth@file.
+api:
+  dashboard: true
+  insecure: true
+
+ping: {}
+
+log:
+  level: INFO
+
+accessLog: {}
+
+entryPoints:
+  web:
+    address: ":80"
+    # Прод: автоматический редирект http→https.
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+  traefik:
+    address: ":8080"
+
+providers:
+  docker:
+    exposedByDefault: false
+    network: curs_curs
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "${ACME_EMAIL}"
+      storage: /letsencrypt/acme.json
+      # TLS-ALPN-01: не требует HTTP-доступа, но требует, чтобы 443 был открыт.
+      tlsChallenge: {}

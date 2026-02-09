@@ -1,0 +1,24 @@
+# Динамические middleware, подгружаются через file provider.
+
+http:
+  middlewares:
+    security-headers:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        customResponseHeaders:
+          X-Powered-By: ""
+          Server: ""
+
+    # Basic-auth для Traefik dashboard в prod.
+    # Сгенерируй пару user:hash: htpasswd -nB admin
+    # Подставь сюда (двойной $ — экранирование для compose):
+    traefik-auth:
+      basicAuth:
+        users:
+          - "admin:$$apr1$$replace$$me_with_htpasswd_output"

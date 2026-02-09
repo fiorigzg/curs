@@ -1,0 +1,50 @@
+# ============================================================
+# CURS — prod overlay
+# ============================================================
+# Подключай поверх base:
+#   DOMAIN=curs.example.com ACME_EMAIL=you@example.com \
+#     docker compose -f infra/docker-compose.yml \
+#                    -f infra/docker-compose.prod.yml \
+#                    --env-file infra/.env up -d
+#
+# Что меняется:
+#   - Traefik снимает биндинги с 8080 (закрывает dashboard от интернета),
+#     открывает 80 и 443 наружу.
+#   - api/postgres/redis перестают торчать на localhost — только через Traefik.
+#   - api получает Traefik labels: https://api.${DOMAIN} → api:8000.
+#   - Traefik dashboard вешается на https://traefik.${DOMAIN} (basic-auth через middleware).
+
+name: curs
+
+services:
+
+  postgres:
+    ports: !reset []
+
+  redis:
+    ports: !reset []
+
+  api:
+    ports: !reset []
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.curs-api.rule=Host(`api.${DOMAIN}`)"
+      - "traefik.http.routers.curs-api.entrypoints=websecure"
+      - "traefik.http.routers.curs-api.tls=true"
+      - "traefik.http.routers.curs-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.curs-api.loadbalancer.server.port=8000"
+      - "traefik.http.routers.curs-api.middlewares=security-headers@file"
+
+  traefik:
+    ports: !reset
+      - "80:80"
+      - "443:443"
+    labels:
+      - "traefik.enable=true"
+      # Dashboard защищён basic-auth (объявлен в dynamic/middlewares.yml).
+      - "traefik.http.routers.curs-traefik.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.routers.curs-traefik.entrypoints=websecure"
+      - "traefik.http.routers.curs-traefik.tls=true"
+      - "traefik.http.routers.curs-traefik.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.curs-traefik.service=api@internal"
+      - "traefik.http.routers.curs-traefik.middlewares=traefik-auth@file,security-headers@file"
