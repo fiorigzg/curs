@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "CURS",
+    "slug": "curs-portfolio-tracker",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "scheme": "curs",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "platforms": ["ios", "android", "web"],
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "splash": {
+      "backgroundColor": "#F7F4EE",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "local.curs.app"
+    },
+    "android": {
+      "package": "local.curs.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#F7F4EE"
+      }
+    },
+    "plugins": [
+      "expo-font",
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "ios": { "deploymentTarget": "15.1" }
+        }
+      ]
+    ],
+    "extra": {
+      "apiBaseUrl": "http://localhost:8000"
+    }
+  }
+}
